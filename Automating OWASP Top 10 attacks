@@ -1,0 +1,35 @@
+import time
+import requests
+
+# Start OWASP ZAP API service
+target = "http://your-website-url.com"
+zap_api_url = "http://localhost:8080/JSON"
+zap_api_key = "your-zap-api-key"
+
+# Start a new session
+response = requests.post(zap_api_url + "/core/action/newSession/", params={"apikey": zap_api_key})
+session_id = response.json()['session']
+
+# Set target URL
+response = requests.post(zap_api_url + "/core/action/setMode/", params={"apikey": zap_api_key, "mode": "standard"})
+response = requests.post(zap_api_url + "/core/action/includeInContext/", params={"apikey": zap_api_key, "contextName": "Default Context", "regex": target})
+
+# Spider the target
+response = requests.post(zap_api_url + "/spider/action/scan/", params={"apikey": zap_api_key, "url": target})
+
+# Wait for the spider to finish
+while int(requests.get(zap_api_url + "/spider/view/status/?scanId=1&apikey=" + zap_api_key).json()['status']) < 100:
+    time.sleep(5)
+
+# Scan the target for vulnerabilities
+response = requests.post(zap_api_url + "/ascan/action/scan/", params={"apikey": zap_api_key, "url": target})
+
+# Wait for the scan to finish
+while int(requests.get(zap_api_url + "/ascan/view/status/?scanId=1&apikey=" + zap_api_key).json()['status']) < 100:
+    time.sleep(5)
+
+# Get the alerts
+response = requests.get(zap_api_url + "/core/view/alerts/?baseurl=" + target + "&apikey=" + zap_api_key)
+alerts = response.json()['alerts']
+for alert in alerts:
+    print(alert['name'] + " : " + alert['risk'])
